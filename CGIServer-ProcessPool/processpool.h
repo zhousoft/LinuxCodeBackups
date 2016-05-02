@@ -321,5 +321,138 @@ void processpool<T>::run_child()
 	close(m_epollfd);
 }
 
+template<T>
+void processpool<T>::run_parent()
+{
+	setup_sig_pipe();
+
+	//父进程监听m_listenfd
+	addfd(m_epollfd, m_listenfd);
+
+	epoll_event events[MAX_EVENT_NUMBER];
+	int sub_process_counter = 0;
+	int new_conn = 1;
+	int number = 0;
+	int ret = -1;
+
+	while( !m_stop)
+	{
+		number = epoll_wait(m_epollfd, events, MAX_EVENT_NUMBER, -1);
+		if((number < 0) && (errno != EINTR))
+		{
+			printf("epoll faliure\n");
+			break;
+		}
+		for(int i = 0; i< numberl; i++)
+		{
+			int sockfd = events[i].data.fd;
+			if(sockfd == m_listenfd)
+			{
+				//有新连接到来，采用循环方式将其分配给一个子进程处理
+				int i = sub_process_counter;
+				do
+				{
+					if(m_sub_process[i].pid != -1)
+					{
+						break;
+					}
+					i = (i+1)%m_process_number;
+				}while(i != m_process_number);
+
+				if(m_sub_process[i].m_pid == -1)
+				{
+					m_stop = true;
+					break;
+				}
+				sub_process_counter = (i+1)%m_process_number;
+				send(m_sub_process[i].m_pipefd[0], (char*)&new_conn, sizeof(new_conn), 0);
+				printf("send request to child %d\n",i);
+			}
+			//处理父进程接收到的信号
+			else if((sockfd == sig_pipefd[0]) && (events[i].events & EPOLLIN))
+			{
+				int sig;
+				char signals[1024];
+				ret = recv(sig_pipefd, signals, sizeof(signals), 0);
+				if(ret <= 0)
+				{
+					continue;
+				}
+				else
+				{
+					for(int i = 0; i < ret; i++)
+					{
+						switch(siganls[i])
+						{
+							case SIGCHLD:
+							{
+								pid_t pid;
+								int stat;
+							    while((pid = waitpid(-1, &stat, WHOHANG)) > 0)//等待任何子进程
+								{
+									for(int i = 0; i < m_process_number; i++)
+									{
+										//如果进程池中第i个进程退出了，则主进程关闭相信的通信管道，
+										//并置m_pid为-1，标记该子进程已经退出
+										if(m_sub_process[i].m_pid == pid)
+										{
+											printf("child %d join\n",i);
+											close(m_sub_process[i].m_pipefd[0]);
+											m_sub_process[i].m_pid = -1;
+										}
+									}
+								}
+								//如果所有子进程都已经退出了，父进程也退出
+								m_stop = true;
+								for(int i = 0; i< m_process_number; i++)
+								{
+									if(m_sub_process[i].m_pid != -1)
+									{
+										m_stop = false;
+										break;
+									}
+								}
+								break;
+							}
+							case SIGTERM:
+							case SIGINT:
+							{
+								//如果父进程收到终止信号，杀死所有子进程并等待子进程全部结束
+								//更好的方式是自定义协议通知子进程来退出
+								printf("kill all child now\n");
+								for(int i = 0; i< m_process_number; i++)
+								{
+									int pid = m_sub_process[i].m_pid;
+									if(pid != -1)
+									{
+										kill(pid, SIGTERM);
+									}
+								}
+								break;
+							}
+							default:
+								break;
+						}
+					}
+				}
+			}
+			else
+			{
+				continue;
+			}
+		}
+	}
+	
+	//释放资源
+	//close(m_listenfd);
+	//此处不应该关闭吗m_listenfd描述符，因为该监听socket是在进程池创建前创建好
+	//传递给进程池的，这样的话进程池中的父子进程都可以直接引用该套接字，关闭
+	//操作应该由该套接字的创建者执行。如果由进程池中父进程创建的话，子进程无法
+	//直接引用，需要通过sendmsg传递
+
+	close(m_epollfd);
+
+}
+
 
 #endif
