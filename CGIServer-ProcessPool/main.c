@@ -1,4 +1,4 @@
-#include <sys/type.h>
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <assert.h>
@@ -6,7 +6,7 @@
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
-#include <fcntcl.h>
+#include <fcntl.h>
 #include <stdlib.h>
 #include <sys/epoll.h>
 #include <signal.h>
@@ -16,7 +16,7 @@
 #include "processpool.h"//进程池头文件
 
 //处理客户CGI请求的类，作为processpool类的模板参数
-calss cgi_conn
+class cgi_conn
 {
 public:
 	cgi_conn(){}
@@ -57,11 +57,11 @@ public:
 			else
 			{
 				m_read_idx += ret;
-				pritnf("user content is %s\n",m_buf);
+				printf("user content is %s\n",m_buf);
 				//如果遇到字符"\r\n"，则开始处理客户端请求
 				for(;idx < m_read_idx; idx++)
 				{
-					if((idx > = 1) && (m_buf[idx-1] == '\r') && (m_buf[idx] == '\n'))
+					if((idx >= 1) && (m_buf[idx-1] == '\r') && (m_buf[idx] == '\n'))
 					{
 						break;
 					}
@@ -87,7 +87,7 @@ public:
 					removefd(m_epollfd, m_sockfd);
 					break;
 				}
-				esle if(ret > 0)
+				else if(ret > 0)
 				{
 					//父进程只需关闭连接
 					removefd(m_epollfd, m_sockfd);
@@ -98,7 +98,7 @@ public:
 					//子进程将标准输出定向到m_sockfd,并执行CGI程序
 					close(STDOUT_FILENO);
 					dup(m_sockfd);
-					execl(m_buf, m_buf);
+					execl(m_buf, m_buf, NULL);
 					exit(0);
 				}
 
@@ -130,7 +130,7 @@ int main(int argc, char* argv[])
 	int port = atoi(argv[2]);
 
 	int listenfd = socket(AF_INET, SOCK_STREAM, 0);
-	assert(listenfd > = 0);
+	assert(listenfd >= 0);
 
 	int ret = 0;
 	struct sockaddr_in address;
