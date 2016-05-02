@@ -5,12 +5,12 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <aseert.h>
+#include <assert.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
-#include <fcntcl.h>
+#include <fcntl.h>
 #include <stdlib.h>
 #include <sys/epoll.h>
 #include <signal.h>
@@ -27,7 +27,7 @@ public:
 	pid_t m_pid;
 	int m_pipefd[2];
 
-}
+};
 
 
 //进程池类,模板参数为处理具体逻辑任务的类
@@ -40,7 +40,7 @@ private:
 
 public:
 	//单例模式，保证程序最多创建一个processpool实例
-	static processpool<T>* create(int listenfd, process_number = 8)
+	static processpool<T>* create(int listenfd, int process_number = 8)
 	{
 		if(m_instance == NULL)
 		{
@@ -88,7 +88,7 @@ private:
 
 //初始化类静态变量
 template<typename T>
-processpool<T*> processpool<T>::m_instance = NULL;
+processpool<T>* processpool<T>::m_instance = NULL;
 
 //用于处理信号的管道,用来实现统一事件源
 static int sig_pipefd[2];
@@ -155,7 +155,7 @@ processpool<T>::processpool(int listenfd, int process_number)
 	for(int i = 0; i< process_number; ++i)
 	{
 		int ret = socketpair(PF_UNIX, SOCK_STREAM, 0, m_sub_process[i].m_pipefd);
-		assert(ret == 0)
+		assert(ret == 0);
 		//fork子进程
 		m_sub_process[i].m_pid = fork();
 		assert(m_sub_process[i].m_pid >= 0);
@@ -215,7 +215,7 @@ void processpool<T>::run_child()
 {
 	setup_sig_pipe();
 	//每个子进程通过其在进程池中的序号m_idx找到与父进程通信的管道
-	int pipefd = m_process_number[m_idx].m_pipefd[1];
+	int pipefd = m_sub_process[m_idx].m_pipefd[1];
 	//子进程监听管道文件描述符，父进程通过该管道通知子进程新连接到来
 	addfd(m_epollfd, pipefd);
 
@@ -229,7 +229,7 @@ void processpool<T>::run_child()
 
 	while(!m_stop)
 	{
-		number = epoll_wait(epollfd, events, MAX_EVENT_NUMBER, -1);
+		number = epoll_wait(m_epollfd, events, MAX_EVENT_NUMBER, -1);
 		if((number < 0 ) && (errno != EINTR))
 		{
 			printf("epoll failure\n");
@@ -260,7 +260,7 @@ void processpool<T>::run_child()
 						printf("errno is: %d\n",errno);
 						continue;
 					}
-					addfd(epollfd, connfd);
+					addfd(m_epollfd, connfd);
 					//模板类必须实现init方法，以初始化一个客户连接，直接使用connfd作为
 					//下标索引逻辑处理对象（T类型对象),牺牲空间换时间，提高程序效率
 					users[connfd].init(m_epollfd, connfd, client_address);
@@ -268,7 +268,6 @@ void processpool<T>::run_child()
 			}
 			else if((sockfd == sig_pipefd[0]) && (events[i].events & EPOLLIN))//子进程的信号事件
 			{
-				int sig;
 				char signals[1024];
 				ret = recv(sig_pipefd[0], signals, sizeof(signals), 0);
 				if(ret <= 0)
@@ -285,7 +284,7 @@ void processpool<T>::run_child()
 							{
 								pid_t pid;
 								int stat;
-								while((pid = waitpid(-1, &stat, WHOHANG)) < 0)
+								while((pid = waitpid(-1, &stat, WNOHANG)) < 0)
 								{
 									continue;
 								}
@@ -321,7 +320,7 @@ void processpool<T>::run_child()
 	close(m_epollfd);
 }
 
-template<T>
+template<typename T>
 void processpool<T>::run_parent()
 {
 	setup_sig_pipe();
@@ -343,7 +342,7 @@ void processpool<T>::run_parent()
 			printf("epoll faliure\n");
 			break;
 		}
-		for(int i = 0; i< numberl; i++)
+		for(int i = 0; i< number; i++)
 		{
 			int sockfd = events[i].data.fd;
 			if(sockfd == m_listenfd)
@@ -352,7 +351,7 @@ void processpool<T>::run_parent()
 				int i = sub_process_counter;
 				do
 				{
-					if(m_sub_process[i].pid != -1)
+					if(m_sub_process[i].m_pid != -1)
 					{
 						break;
 					}
@@ -371,9 +370,8 @@ void processpool<T>::run_parent()
 			//处理父进程接收到的信号
 			else if((sockfd == sig_pipefd[0]) && (events[i].events & EPOLLIN))
 			{
-				int sig;
 				char signals[1024];
-				ret = recv(sig_pipefd, signals, sizeof(signals), 0);
+				ret = recv(sig_pipefd[0], signals, sizeof(signals), 0);
 				if(ret <= 0)
 				{
 					continue;
@@ -382,13 +380,13 @@ void processpool<T>::run_parent()
 				{
 					for(int i = 0; i < ret; i++)
 					{
-						switch(siganls[i])
+						switch(signals[i])
 						{
 							case SIGCHLD:
 							{
 								pid_t pid;
 								int stat;
-							    while((pid = waitpid(-1, &stat, WHOHANG)) > 0)//等待任何子进程
+							    while((pid = waitpid(-1, &stat, WNOHANG)) > 0)//等待任何子进程
 								{
 									for(int i = 0; i < m_process_number; i++)
 									{
