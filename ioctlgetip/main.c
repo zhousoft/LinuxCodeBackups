@@ -16,13 +16,13 @@ int main()
 		perror("socket error");
 		return -1;
 	}
-	strcpy(ifr.ifr_name,"wlan0");
+	strcpy(ifr.ifr_name,"wlan0");//无线网卡
 	if(ioctl(sockfd, SIOCGIFADDR, &ifr) < 0)//直接获取IP地址
 	{
 		perror("ioctl error");
 		return -1;
 	}
-	memcpy(&sin, &ifr.ifr_dstaddr, sizeof(sin));
+	memcpy(&sin, &ifr.ifr_addr, sizeof(sin));
 	printf("ip is %s \n",inet_ntoa(sin.sin_addr));
 	return 0;
 }
