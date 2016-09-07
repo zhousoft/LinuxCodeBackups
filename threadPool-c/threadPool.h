@@ -1,4 +1,4 @@
-#ifndef     _THREADPOOL_H_
+#ifndef    _THREADPOOL_H_
 #define    _THREADPOOL_H_
 
 #include <stdio.h>
@@ -16,31 +16,31 @@ struct task
     void *(*task)(void *arg);
     void *arg;
 
-    struct task  *next;
+    struct task *next;
 }; 
 
 typedef  struct thread_pool
 {
-    pthread_mutex_t lock;
-    pthread_cond_t  cond;
+    pthread_mutex_t lock;//操作任务队列互斥锁
+    pthread_cond_t  cond;//条件变量，同步所有线程
     
-    struct task *task_list;
+    struct task *task_list;//任务队列
 
-     pthread_t *tids;
+    pthread_t *tids;//线程ID
 
-     unsigned  int waiting_tasks;
-     unsigned int active_threads;
+    unsigned  int waiting_tasks;//任务队列中等待任务数
+    unsigned int active_threads;//当前活跃线程数
 
-     int isdestroy;
+    int isdestroy;//线程池销毁标记
 }thread_pool;
 //初始化线程池
 int int_pool(thread_pool *pool,unsigned int thread_numbers);
 //添加任务
 int add_task(thread_pool *pool. void *(*task)(void *arg),void *arg);
 //添加线程
-int add_thread(thread_pool *pool, unsigned int addied_threads_numbers);
+int add_thread(thread_pool *pool, unsigned int adding_threads_numbers);
 //移除线程
-int remove_thread(thread_pool *pool, unsigned int removed_threads_number);
+int remove_thread(thread_pool *pool, unsigned int removing_threads_number);
 //销毁线程池
 int destroy_pool(thread_pool *pool)
 //线程服务函数
