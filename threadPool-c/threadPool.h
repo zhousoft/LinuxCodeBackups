@@ -38,13 +38,13 @@ int int_pool(thread_pool *pool,unsigned int thread_numbers);
 //添加任务
 int add_task(thread_pool *pool. void *(*task)(void *arg),void *arg);
 //添加线程
-int add_thread(thread_pool *pool, unsigned int adding_threads_numbers);
+int add_thread(thread_pool *pool, unsigned int adding_threads_number);
 //移除线程
 int remove_thread(thread_pool *pool, unsigned int removing_threads_number);
 //销毁线程池
 int destroy_pool(thread_pool *pool)
-//线程服务函数
-void *thread_server(void *arg);
+//线程工作函数
+void *work(void *arg);
 
 
 
