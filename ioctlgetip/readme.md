@@ -1,4 +1,4 @@
-##使用iotcl读取网卡信息获取真实ip
+# 使用iotcl读取网卡信息获取真实ip
 项目过程中曾经使用gethostname和gethostbyname来读取本地ip，在ubuntu下发现有问
 题，查询文档发现gethostbyname要解析/etc/hosts文件来获取ip，本机该文件内没有真
 实ip，为避免hosts文件状态不确定的影响，通过ioctl读取网卡状态信息来获取ip的方
